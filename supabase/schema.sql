@@ -39,6 +39,7 @@ drop table if exists kb_articles cascade;
 drop table if exists media_assets cascade;
 drop table if exists audit_logs cascade;
 drop table if exists role_permissions cascade;
+drop table if exists app_state cascade;
 drop table if exists contact_messages cascade;
 drop table if exists franchise_inquiries cascade;
 drop table if exists job_applications cascade;
@@ -638,6 +639,16 @@ create table if not exists audit_logs (
 );
 create index if not exists idx_audit_module on audit_logs (module);
 
+-- Generic key-value store: catches every remaining piece of app state so the
+-- website syncs "every step" — checklist ticks, clock records, shift covers…
+create table if not exists app_state (
+  key        text primary key,
+  value      jsonb,
+  updated_at timestamptz not null default now()
+);
+create trigger trg_app_state_updated before update on app_state
+  for each row execute function set_updated_at();
+
 create table if not exists role_permissions (
   role      employee_role primary key,
   "view"    boolean not null default true,
@@ -721,7 +732,7 @@ begin
     'staff_documents','sifr_reports','training_courses','training_assessments',
     'kb_articles','job_vacancies','job_applications','franchise_inquiries',
     'contact_messages','news_posts','cms_pages','media_assets','audit_logs',
-    'role_permissions'
+    'role_permissions','app_state'
   ] loop
     execute format('alter table %I enable row level security', t);
     execute format('drop policy if exists demo_full_access on %I', t);

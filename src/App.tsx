@@ -137,10 +137,18 @@ export default function App() {
       }));
     });
     if (!isCloudConfigured()) return;
-    pullAllFromCloud().then((data) => {
+
+    const applyCloudData = (data: Record<string, any>) => {
       const apply = (key: string, setter: (v: any) => void) => {
         if (data[key] !== undefined && data[key] !== null && (!Array.isArray(data[key]) || data[key].length > 0)) setter(data[key]);
       };
+      // Key-value states (checklist ticks, clock records, shift covers…) land
+      // straight in localStorage so every screen reads the freshest copy.
+      if (data.__kv__) {
+        for (const [k, v] of Object.entries(data.__kv__)) {
+          try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* quota */ }
+        }
+      }
       apply('milkpop_site_settings', setSiteSettings);
       apply('milkpop_menu_items', setMenuItems);
       apply('milkpop_deals', setDeals);
@@ -163,10 +171,33 @@ export default function App() {
       apply('milkpop_media_library', setMediaItems);
       apply('milkpop_audit_logs', setAuditLogs);
       apply('milkpop_permissions_config', setRolePermissions);
+    };
+
+    const runPull = () => pullAllFromCloud().then((data) => {
+      applyCloudData(data);
       setCloudStatus((prev) => ({ ...prev, connected: true, lastSyncAt: new Date().toISOString() }));
     }).catch((e) => {
       setCloudStatus((prev) => ({ ...prev, connected: false, lastError: String(e?.message || e) }));
     });
+
+    // Boot: hydrate everything from the cloud.
+    runPull();
+
+    // Live: whenever this tab regains focus, quietly re-pull (throttled) so a
+    // change made on one device appears on every other device on next glance.
+    let lastPull = Date.now();
+    const onFocus = () => {
+      if (document.visibilityState !== 'visible') return;
+      if (Date.now() - lastPull < 30000) return;
+      lastPull = Date.now();
+      runPull();
+    };
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onFocus);
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onFocus);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

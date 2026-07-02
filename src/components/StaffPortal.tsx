@@ -65,6 +65,7 @@ import {
   ChecklistTemplateItem
 } from '../types';
 import { LogoVertical, LogoIcon } from '../brand';
+import { schedulePush } from '../lib/cloudSync';
 import { SalesPOS } from './SalesPOS';
 import { WaveDivider } from './WaveDivider';
 import {
@@ -421,12 +422,14 @@ export const StaffPortal: React.FC<StaffPortalProps> = ({
   useEffect(() => {
     try {
       localStorage.setItem('milkpop_checklist_tasks', JSON.stringify(checklistTasks));
+      schedulePush('milkpop_checklist_tasks', checklistTasks);
     } catch (e) {}
   }, [checklistTasks]);
 
   useEffect(() => {
     try {
       localStorage.setItem('milkpop_checklist_audits', JSON.stringify(checklistAuditLogs));
+      schedulePush('milkpop_checklist_audits', checklistAuditLogs);
     } catch (e) {}
   }, [checklistAuditLogs]);
 
@@ -498,6 +501,7 @@ export const StaffPortal: React.FC<StaffPortalProps> = ({
     // Sync checkist audits instantly to both namespaces for real-time compliance cross-over!
     try {
       localStorage.setItem('milkpop_checklist_audits', JSON.stringify(updatedLogs));
+      schedulePush('milkpop_checklist_audits', updatedLogs);
     } catch(e){}
 
     // Clean checks for current category so we start fresh!
@@ -605,6 +609,7 @@ export const StaffPortal: React.FC<StaffPortalProps> = ({
     setClockStatus(newStatus);
     try {
       localStorage.setItem(`milkpop_clock_status_${employee.id}`, JSON.stringify(newStatus));
+      schedulePush(`milkpop_clock_status_${employee.id}`, newStatus);
     } catch (err) {
       console.warn(err);
     }
@@ -623,6 +628,7 @@ export const StaffPortal: React.FC<StaffPortalProps> = ({
     setClockStatus(newStatus);
     try {
       localStorage.setItem(`milkpop_clock_status_${employee.id}`, JSON.stringify(newStatus));
+      schedulePush(`milkpop_clock_status_${employee.id}`, newStatus);
     } catch (err) {
       console.warn(err);
     }
@@ -645,6 +651,7 @@ export const StaffPortal: React.FC<StaffPortalProps> = ({
     setClockStatus(newStatus);
     try {
       localStorage.setItem(`milkpop_clock_status_${employee.id}`, JSON.stringify(newStatus));
+      schedulePush(`milkpop_clock_status_${employee.id}`, newStatus);
     } catch (err) {
       console.warn(err);
     }
@@ -685,6 +692,7 @@ export const StaffPortal: React.FC<StaffPortalProps> = ({
     setClockHistory(updatedLog);
     try {
       localStorage.setItem('milkpop_clock_history', JSON.stringify(updatedLog));
+      schedulePush('milkpop_clock_history', updatedLog);
     } catch (err) {
       console.warn(err);
     }
@@ -697,6 +705,7 @@ export const StaffPortal: React.FC<StaffPortalProps> = ({
     setClockStatus(resetClock);
     try {
       localStorage.setItem(`milkpop_clock_status_${employee.id}`, JSON.stringify(resetClock));
+      schedulePush(`milkpop_clock_status_${employee.id}`, resetClock);
     } catch (err) {
       console.warn(err);
     }
@@ -721,6 +730,7 @@ export const StaffPortal: React.FC<StaffPortalProps> = ({
     setCoverRequests(updated);
     try {
       localStorage.setItem('milkpop_shift_covers', JSON.stringify(updated));
+      schedulePush('milkpop_shift_covers', updated);
     } catch (err) {
       console.warn(err);
     }
@@ -735,6 +745,7 @@ export const StaffPortal: React.FC<StaffPortalProps> = ({
     setCoverRequests(updated);
     try {
       localStorage.setItem('milkpop_shift_covers', JSON.stringify(updated));
+      schedulePush('milkpop_shift_covers', updated);
     } catch (err) {
       console.warn(err);
     }
@@ -770,6 +781,7 @@ export const StaffPortal: React.FC<StaffPortalProps> = ({
       setCoverRequests(updatedCovers);
       try {
         localStorage.setItem('milkpop_shift_covers', JSON.stringify(updatedCovers));
+        schedulePush('milkpop_shift_covers', updatedCovers);
       } catch (err) {}
 
       addToast(`Roster transfer secured! You are now scheduled for ${shift.date} (${shift.startTime}-${shift.endTime}). Thanks for supporting the team! ❤️`, 'success');

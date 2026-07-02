@@ -58,6 +58,17 @@ export const SYNC_MAP: SyncMapping[] = [
 
 const byKey = new Map(SYNC_MAP.map((m) => [m.storageKey, m]));
 
+/** Every remaining localStorage key syncs through the app_state KV table —
+ *  nothing on the website is device-only (except the login session). */
+export const KV_KEYS = [
+  'milkpop_checklist_tasks',
+  'milkpop_checklist_audits',
+  'milkpop_clock_history',
+  'milkpop_shift_covers',
+];
+export const KV_PREFIXES = ['milkpop_clock_status_'];
+const isKvKey = (key: string) => KV_KEYS.includes(key) || KV_PREFIXES.some((p) => key.startsWith(p));
+
 export type CloudListener = (status: { syncing: boolean; lastSyncAt?: string; lastError?: string }) => void;
 let listener: CloudListener | null = null;
 export const onCloudStatus = (fn: CloudListener) => { listener = fn; };
@@ -85,6 +96,12 @@ export async function pullAllFromCloud(): Promise<Record<string, any>> {
   emit({ syncing: true });
   const result: Record<string, any> = {};
   const errors: string[] = [];
+  try {
+    const kvRows = await sbSelect<{ key: string; value: any }>('app_state', 'select=key,value');
+    result.__kv__ = Object.fromEntries(kvRows.map((r) => [r.key, r.value]));
+  } catch (e: any) {
+    errors.push(`app_state: ${e?.message || e}`);
+  }
   for (const m of SYNC_MAP) {
     try {
       const rows = await sbSelect(m.table);
@@ -120,7 +137,8 @@ const pending = new Map<string, any>();
 const timers = new Map<string, ReturnType<typeof setTimeout>>();
 
 export function schedulePush(storageKey: string, value: any, delayMs = 900) {
-  if (!isCloudConfigured() || !byKey.has(storageKey)) return;
+  if (!isCloudConfigured()) return;
+  if (!byKey.has(storageKey) && !isKvKey(storageKey)) return;
   pending.set(storageKey, value);
   const existing = timers.get(storageKey);
   if (existing) clearTimeout(existing);
@@ -128,11 +146,23 @@ export function schedulePush(storageKey: string, value: any, delayMs = 900) {
 }
 
 async function flushKey(storageKey: string) {
-  const mapping = byKey.get(storageKey);
-  if (!mapping || !isCloudConfigured()) return;
+  if (!isCloudConfigured()) return;
   const value = pending.get(storageKey);
   pending.delete(storageKey);
   timers.delete(storageKey);
+  // KV keys go straight into the app_state table
+  if (isKvKey(storageKey)) {
+    emit({ syncing: true });
+    try {
+      await sbUpsert('app_state', [{ key: storageKey, value }], 'key');
+      emit({ syncing: false, lastSyncAt: new Date().toISOString() });
+    } catch (e: any) {
+      emit({ syncing: false, lastError: `app_state: ${e?.message || e}` });
+    }
+    return;
+  }
+  const mapping = byKey.get(storageKey);
+  if (!mapping) return;
   emit({ syncing: true });
   try {
     if (mapping.singleton) {
@@ -171,6 +201,20 @@ async function flushKey(storageKey: string) {
 export async function pushAllToCloud(readLocal: (key: string) => any): Promise<string | null> {
   if (!isCloudConfigured()) return 'Supabase is not configured';
   const errors: string[] = [];
+  // KV keys first (including per-employee clock status keys found in storage)
+  const kvCandidates = [...KV_KEYS];
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && KV_PREFIXES.some((p) => k.startsWith(p))) kvCandidates.push(k);
+    }
+  } catch { /* SSR safety */ }
+  for (const key of kvCandidates) {
+    const val = readLocal(key);
+    if (val === undefined || val === null) continue;
+    pending.set(key, val);
+    try { await flushKey(key); } catch (e: any) { errors.push(`${key}: ${e?.message || e}`); }
+  }
   for (const m of SYNC_MAP) {
     const val = readLocal(m.storageKey);
     if (val === undefined || val === null) continue;
