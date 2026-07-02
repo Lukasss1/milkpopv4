@@ -1,0 +1,6 @@
+{
+  "name": "Milk Pop",
+  "description": "Premium digital home, brand platform, and operational hub for Milk Pop.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
