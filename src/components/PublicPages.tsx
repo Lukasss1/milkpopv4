@@ -497,54 +497,34 @@ export const PublicPages: React.FC<PublicPagesProps> = ({
                 )}
               </motion.div>
 
-              {/* Mascot stage */}
+              {/* Mascot stage — he IS the hero, always animated, always waving */}
               <div className="lg:col-span-6 relative flex justify-center items-end lg:items-center">
-                {(isEditingMode || hasRealHeroImage) ? (
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.85 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ type: 'spring', stiffness: 70, damping: 14, delay: 0.3 }}
-                    className="relative w-72 h-72 sm:w-96 sm:h-96 rounded-full bg-white/95 shadow-2xl overflow-hidden border-4 border-white/60 flex items-center justify-center"
-                  >
-                    {isEditingMode ? (
-                      <ImageUploadInline
-                        currentImageUrl={currentHomeCms?.heroImage || ''}
-                        onImageChange={(val) => handleEditDraft('cms_home', 'heroImage', val)}
-                        className="w-full h-full"
-                        imgClassName="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <img src={currentHomeCms?.heroImage} className="w-full h-full object-cover" alt="Milk Pop hero" />
-                    )}
-                  </motion.div>
-                ) : (
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.7, y: 70 }}
-                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                    transition={{ type: 'spring', stiffness: 64, damping: 13, delay: 0.35 }}
-                    className="relative"
-                  >
-                    {/* soft contact shadow under the mascot */}
-                    <div className="absolute left-1/2 -translate-x-1/2 bottom-2 w-2/3 h-8 bg-black/20 blur-2xl rounded-full" />
-                    <div className="mp-bob">
-                      <img
-                        src={MASCOT.wave}
-                        alt="The Milk Pop mascot waving hello"
-                        className="mp-wave w-72 sm:w-96 lg:w-[30rem] h-auto relative z-10 drop-shadow-2xl select-none"
-                        draggable={false}
-                      />
-                    </div>
-                    <img src={STICKERS.swirl} alt="" aria-hidden="true"
-                      className="mp-drift absolute -right-4 top-2 w-16 sm:w-24 opacity-90"
-                      style={{ ['--mp-tilt' as any]: '8deg', animationDelay: '0.8s' }} />
-                    <img src={STICKERS.cup} alt="" aria-hidden="true"
-                      className="mp-drift absolute -left-10 bottom-16 w-14 sm:w-20 opacity-90"
-                      style={{ ['--mp-tilt' as any]: '-10deg', animationDelay: '2s' }} />
-                    <img src={STICKERS.mPink} alt="" aria-hidden="true"
-                      className="mp-drift absolute -left-4 top-6 w-12 sm:w-16 opacity-80 blur-[1px]"
-                      style={{ ['--mp-tilt' as any]: '-6deg', animationDelay: '3.4s' }} />
-                  </motion.div>
-                )}
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.6, y: 90 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  transition={{ type: 'spring', stiffness: 60, damping: 12, delay: 0.3 }}
+                  className="relative"
+                >
+                  {/* soft contact shadow under the mascot */}
+                  <div className="absolute left-1/2 -translate-x-1/2 bottom-2 w-2/3 h-8 bg-black/20 blur-2xl rounded-full" />
+                  <div className="mp-bob">
+                    <img
+                      src={MASCOT.wave}
+                      alt="The Milk Pop mascot waving hello"
+                      className="mp-wave w-80 sm:w-[26rem] lg:w-[34rem] h-auto relative z-10 drop-shadow-2xl select-none"
+                      draggable={false}
+                    />
+                  </div>
+                  <img src={STICKERS.swirl} alt="" aria-hidden="true"
+                    className="mp-drift absolute -right-4 top-2 w-16 sm:w-24 opacity-90"
+                    style={{ ['--mp-tilt' as any]: '8deg', animationDelay: '0.8s' }} />
+                  <img src={STICKERS.cup} alt="" aria-hidden="true"
+                    className="mp-drift absolute -left-10 bottom-16 w-14 sm:w-20 opacity-90"
+                    style={{ ['--mp-tilt' as any]: '-10deg', animationDelay: '2s' }} />
+                  <img src={STICKERS.mPink} alt="" aria-hidden="true"
+                    className="mp-drift absolute -left-4 top-6 w-12 sm:w-16 opacity-80 blur-[1px]"
+                    style={{ ['--mp-tilt' as any]: '-6deg', animationDelay: '3.4s' }} />
+                </motion.div>
               </div>
             </div>
 

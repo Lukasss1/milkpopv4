@@ -69,6 +69,7 @@ import {
 } from './data';
 import { isCloudConfigured } from './lib/supabase';
 import { pullAllFromCloud, onCloudStatus } from './lib/cloudSync';
+import { LogoVertical, MASCOT, DRIP_PATH, DRIP_VIEWBOX } from './brand';
 import { INITIAL_ASSESSMENTS } from './trainingData';
 import { useLocalStorageState } from './hooks/useLocalStorageState';
 import {
@@ -202,6 +203,13 @@ export default function App() {
   }, []);
 
   const [toasts, setToasts] = useState<ToastAlert[]>([]);
+
+  // Branded boot splash — the mascot welcomes every visitor while the app loads.
+  const [showSplash, setShowSplash] = useState<boolean>(true);
+  useEffect(() => {
+    const t = setTimeout(() => setShowSplash(false), 1600);
+    return () => clearTimeout(t);
+  }, []);
 
   // Automatically manage isStaffMode based on currentTab
   useEffect(() => {
@@ -443,6 +451,55 @@ export default function App() {
 
   return (
     <div className="bg-[#FFFFFF] min-h-screen text-[#2E2A26] font-sans antialiased flex flex-col justify-between">
+      {/* ---------- Loading screen: caramel field, waving mascot, white drips ---------- */}
+      <AnimatePresence>
+        {showSplash && (
+          <motion.div
+            key="boot-splash"
+            initial={{ opacity: 1 }}
+            exit={{ opacity: 0, scale: 1.04, transition: { duration: 0.55, ease: [0.22, 1, 0.36, 1] } }}
+            className="fixed inset-0 z-[200] bg-[#BD783A] flex flex-col items-center justify-center overflow-hidden"
+            aria-label="Milk Pop is loading"
+          >
+            <div className="pointer-events-none absolute inset-0"
+              style={{ background: 'radial-gradient(ellipse 60% 50% at 50% 42%, rgba(255,255,255,0.14), transparent 70%)' }} />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.5, y: 60 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              transition={{ type: 'spring', stiffness: 80, damping: 12 }}
+              className="relative flex flex-col items-center"
+            >
+              <div className="mp-bob">
+                <img src={MASCOT.wave} alt="" className="mp-wave w-48 sm:w-64 h-auto drop-shadow-2xl select-none" draggable={false} />
+              </div>
+              <motion.div
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.35, type: 'spring', stiffness: 90, damping: 16 }}
+              >
+                <LogoVertical color="#FFFFFF" className="h-20 sm:h-24 w-auto mt-6" title="Milk Pop" />
+              </motion.div>
+              {/* three little milk-drop loading dots */}
+              <div className="flex items-center gap-2 mt-7" aria-hidden="true">
+                {[0, 1, 2].map((i) => (
+                  <motion.span
+                    key={i}
+                    className="h-2.5 w-2.5 rounded-full bg-white/90"
+                    animate={{ y: [0, -8, 0], opacity: [0.5, 1, 0.5] }}
+                    transition={{ repeat: Infinity, duration: 0.9, delay: i * 0.16, ease: 'easeInOut' }}
+                  />
+                ))}
+              </div>
+            </motion.div>
+            {/* white drips rising at the very bottom, like milk filling the screen */}
+            <svg viewBox={DRIP_VIEWBOX} preserveAspectRatio="none"
+              className="absolute bottom-0 left-0 w-full h-16 sm:h-24" style={{ transform: 'rotate(180deg)' }} aria-hidden="true">
+              <path d={DRIP_PATH} fill="#FFFFFF" />
+            </svg>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Owner-editable announcement ribbon (Admin Panel → Company Settings) */}
       {siteSettings.announcementEnabled && currentTab !== 'admin_panel' && !isStaffMode && (
         <div className="bg-[#7CC0C7] text-[#2E2A26] text-center text-xs font-bold tracking-wide py-2 px-4">
