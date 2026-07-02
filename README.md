@@ -1,132 +1,108 @@
-# Milk Pop - Operations & E-Commerce Platform
+/**
+ * @file notify.ts
+ * @description Real e-mail notifications ("Your payslip is available",
+ * "You have a new shift scheduled", …).
+ *
+ * Browsers cannot send e-mail directly — doing so would expose your mail
+ * credentials to anyone who opens DevTools. Delivery therefore happens
+ * server-side through the Supabase Edge Function `send-email`
+ * (supabase/functions/send-email/index.ts), which talks to Resend.
+ *
+ * Setup (one-off, ~5 minutes) is documented in supabase/EMAIL_SETUP.md.
+ * Until the function is deployed, every send returns an honest error —
+ * nothing here is simulated.
+ */
+import { isCloudConfigured, sbInvokeFunction } from './supabase';
+import { EmailSettings, Payslip, WorkShift } from '../types';
 
-A comprehensive single-page React application functioning as both the public-facing storefront and the internal staff operations platform for Milk Pop.
+export const DEFAULT_EMAIL_SETTINGS: EmailSettings = {
+  enabled: false,
+  fromName: 'Milk Pop',
+  notifyNewShift: true,
+  notifyPayslip: true,
+};
 
-## Features
+export interface SendEmailInput {
+  to: string;
+  subject: string;
+  html: string;
+  fromName?: string;
+}
 
-- **Public Storefront**: Browse menu items (Milkshakes, Smoothies, Slush, Soft Serve), locate stores, read articles/news, and apply for franchise/career opportunities.
-- **Administrative Portal**: Complete CRUD operations for Menu recipes, Store locations, Employee profiles, Job vacancies, Knowledge base articles, News announcements, and Shift scheduling.
-- **Staff Operations (SIFR)**: Interactive tools for daily store operations, audits, compliance checks, and performance tracking.
-- **Content Management System (CMS)**: Visual editing tools to manage home page banners, featured products, and media library assets.
+/** Sends an e-mail through the Edge Function. Returns null on success, or an error string. */
+export async function sendEmail(input: SendEmailInput): Promise<string | null> {
+  if (!isCloudConfigured()) {
+    return 'Supabase is not connected — connect it in Company Settings first.';
+  }
+  if (!input.to || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(input.to)) {
+    return `"${input.to || '(empty)'}" is not a valid e-mail address.`;
+  }
+  try {
+    const res = await sbInvokeFunction<{ ok?: boolean; error?: string }>('send-email', input);
+    if (res && res.error) return res.error;
+    return null;
+  } catch (e: any) {
+    const msg = String(e?.message || e);
+    if (msg.includes('404')) {
+      return 'The send-email Edge Function is not deployed yet — see supabase/EMAIL_SETUP.md.';
+    }
+    return msg;
+  }
+}
 
-## Quick Start (Running Locally)
+/* ------------------------------------------------------------------ */
+/*  Branded HTML templates                                             */
+/* ------------------------------------------------------------------ */
+const wrap = (title: string, body: string, brandName: string) => `
+<div style="font-family:Arial,Helvetica,sans-serif;background:#F7F1E8;padding:24px">
+  <div style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #EBDECE">
+    <div style="background:#BD783A;padding:20px 28px">
+      <span style="color:#ffffff;font-size:18px;font-weight:800;letter-spacing:2px">${brandName.toUpperCase()}</span>
+    </div>
+    <div style="padding:28px">
+      <h2 style="margin:0 0 12px;color:#2E2A26;font-size:18px">${title}</h2>
+      ${body}
+    </div>
+    <div style="background:#EBDECE;padding:14px 28px;color:#2E2A26;font-size:11px">
+      This is an automated message from the ${brandName} staff platform. Please do not reply.
+    </div>
+  </div>
+</div>`;
 
-### Prerequisites
+export function payslipEmailHtml(p: Payslip, currency: string, brandName: string): string {
+  const row = (label: string, value: string, strong = false) =>
+    `<tr><td style="padding:8px 0;color:#6b6b6b;font-size:13px">${label}</td>
+     <td style="padding:8px 0;text-align:right;font-size:13px;color:#2E2A26;${strong ? 'font-weight:800' : ''}">${value}</td></tr>`;
+  const body = `
+    <p style="color:#2E2A26;font-size:14px;margin:0 0 16px">Hi ${p.employeeName.split(' ')[0]}, your payslip for <b>${p.periodLabel}</b> is now available.</p>
+    <table style="width:100%;border-collapse:collapse;border-top:1px solid #EBDECE;border-bottom:1px solid #EBDECE">
+      ${row('Pay period', p.periodLabel)}
+      ${row('Approved hours', `${p.hoursTotal.toFixed(2)} hrs`)}
+      ${row('Hourly rate', `${currency}${p.hourlyRate.toFixed(2)}`)}
+      ${row('Gross pay', `${currency}${p.gross.toFixed(2)}`)}
+      ${row('Deductions', `${currency}${p.deductions.toFixed(2)}`)}
+      ${row('Net pay', `${currency}${p.net.toFixed(2)}`, true)}
+    </table>
+    <p style="color:#6b6b6b;font-size:12px;margin:16px 0 0">You can also view this payslip any time in your Staff Dashboard.</p>`;
+  return wrap('Your payslip is available', body, brandName);
+}
 
-- [Node.js](https://nodejs.org/) (v18.x or newer recommended)
-- `npm` (v8.x or newer)
+export function newShiftEmailHtml(shift: WorkShift, brandName: string): string {
+  const niceDate = new Date(shift.date + 'T00:00:00').toLocaleDateString('en-GB', {
+    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+  });
+  const body = `
+    <p style="color:#2E2A26;font-size:14px;margin:0 0 16px">Hi ${shift.employeeName.split(' ')[0]}, a new shift has been scheduled for you.</p>
+    <div style="background:#F7F1E8;border:1px solid #EBDECE;border-radius:12px;padding:16px">
+      <p style="margin:0 0 6px;color:#2E2A26;font-size:14px"><b>${niceDate}</b></p>
+      <p style="margin:0 0 6px;color:#2E2A26;font-size:14px">${shift.startTime} – ${shift.endTime} · ${shift.type.toUpperCase()}</p>
+      <p style="margin:0;color:#6b6b6b;font-size:13px">${shift.storeName}</p>
+      ${shift.notes ? `<p style="margin:8px 0 0;color:#6b6b6b;font-size:12px">Notes: ${shift.notes}</p>` : ''}
+    </div>
+    <p style="color:#6b6b6b;font-size:12px;margin:16px 0 0">Check your full rota in the Staff Dashboard.</p>`;
+  return wrap('You have a new shift scheduled', body, brandName);
+}
 
-### Installation
-
-1. **Clone or Extract the Source Code**:
-   Navigate into the project directory using your terminal.
-
-   ```bash
-   cd milk-pop-app
-   ```
-
-2. **Install Dependencies**:
-   Install all required Node modules.
-
-   ```bash
-   npm install
-   ```
-
-### Running the Development Server
-
-Start the Vite development server:
-
-```bash
-npm run dev
-```
-
-This will launch the application locally. Open your browser and navigate to `http://localhost:3000` (or whichever port Vite successfully binds to, typically indicated in your terminal output).
-
-### Building for Production
-
-To create an optimized production build:
-
-```bash
-npm run build
-```
-
-This command generates a `dist` folder containing minified, production-ready static assets that can be deployed to any static host (Vercel, Netlify, AWS S3, etc.).
-
-
-## Brand system (from the official brandbook)
-
-The visual identity is implemented 1:1 from the brandbook (`Милкпоп2.pdf`):
-
-- **Logos** — the vertical, horizontal and icon lock-ups were vector-traced
-  from the brandbook artwork and live as React components in `src/brand.tsx`
-  (`LogoVertical`, `LogoHorizontal`, `LogoIcon`). Per the brandbook: horizontal
-  in the site header, white version on dark backgrounds, icon for the favicon.
-- **Palette** — caramel `#BD783A` (Pantone 287C) and milk-blue `#7CC0C7`
-  (Pantone 285C), near-black ink for text; defined as tokens in `src/index.css`.
-- **Patterns** — the milk-drip top edge and wave bottom edge are traced brand
-  paths (`DripEdge`, `WaveEdge` in `src/brand.tsx`); `WaveDivider` now renders
-  them everywhere it was already used.
-- **Mascot & stickers** — extracted with transparency into `public/brand/`
-  (`MASCOT` and `STICKERS` maps in `src/brand.tsx`).
-- **Typeface** — the brandbook specifies **Unageo** (Bold + Light). It isn't on
-  Google Fonts; if you own the files, drop `Unageo-Bold` / `Unageo-Light`
-  (woff2 or otf) into `public/fonts/` and the site picks them up automatically.
-  Until then it falls back to Poppins, the closest geometric sans available.
-
-## Sales system
-
-- **Staff Till (POS)** — Staff Portal → *Till / POS*: category grid, sizes,
-  extras per line, live combo engine (the brandbook deals “1+1” and “1+1=3”
-  auto-apply, best deal wins), walk-in/phone/Deliveroo/Uber Eats/Just Eat
-  channels, cash with change calculation or card/online, VAT-inclusive totals.
-- **Sales & Orders** (Admin) — revenue KPIs, top sellers, filterable order
-  ledger with expandable line detail, refund and void with audit logging.
-- **Deals & Combos** (Admin, owner) — create/edit/pause promotions; they apply
-  at the Till and show on the public menu and homepage instantly.
-
-## Owner editing tools
-
-Everything on the site is editable from the Admin Panel without code:
-Website Content (CMS pages + on-page edit mode), Menu Items, Store Locations,
-News, Media, **Deals & Combos**, **Staff Checklists** (feeds the Staff Portal
-checklist screen live), Academy courses & assessments, Knowledge Base,
-Staff Directory / Rota / Documents / SIFR, Permissions Matrix, and
-**Company Settings** — brand contacts, social links, footer copy, allergen
-notice, announcement ribbon, currency symbol and the VAT rate used by the Till.
-
-## Cloud database (Supabase)
-
-The app is offline-first (localStorage) and can mirror every registry to a
-real PostgreSQL database. See **`supabase/README.md`** — run `schema.sql` +
-`seed.sql`, then connect from *Admin Panel → Company Settings → Cloud
-database*. Orders are normalised server-side for SQL analytics
-(`daily_sales`, `top_products`, `sales_by_channel`, `popular_modifiers`).
-
-## Technologies Used
-
-- **Framework**: [React](https://reactjs.org/) (v18+) Functional Components & Hooks
-- **Build Tool**: [Vite](https://vitejs.dev/) - Lightning-fast frontend tooling
-- **Styling**: [Tailwind CSS](https://tailwindcss.com/) - Utility-first CSS framework
-- **Icons**: [Lucide React](https://lucide.dev/)
-- **Animation**: [Framer Motion](https://www.framer.com/motion/) (via `motion/react`)
-- **Language**: [TypeScript](https://www.typescriptlang.org/) - For robust type safety
-- **Routing**: Internal state-based routing (`currentTab` states) optimized for Single-Page Application behavior without complex browser history management (easily upgradeable to React Router if needed).
-- **Data Persistence**: Local Storage API (Mock Database) - Temporarily holding the state in local browsers.
-- **Typography**: Unageo (brandbook typeface, self-hosted hook) with Poppins fallback
-
-## Environment Variables
-
-Currently, the application is designed to be fully client-side for demonstration and immediate operations usage, meaning no environment variables are strictly required to start the frontend.
-
-However, moving forward toward backend integration, you'll find an example `.env.example` file at the root. Anticipated future variables:
-
-```env
-# Future backend API URL
-VITE_API_BASE_URL=
-# Examples of potential future integrations:
-VITE_STRIPE_PUBLIC_KEY=
-VITE_SUPABASE_URL=
-VITE_SUPABASE_ANON_KEY=
-```
-
-_Note: The frontend codebase has been scanned, and there are **no hardcoded API keys or secrets** stored within the repository._
+export function genericEmailHtml(title: string, message: string, brandName: string): string {
+  return wrap(title, `<p style="color:#2E2A26;font-size:14px;margin:0">${message}</p>`, brandName);
+}

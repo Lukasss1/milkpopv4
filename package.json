@@ -1,37 +1,79 @@
-{
-  "name": "react-example",
-  "private": true,
-  "version": "0.0.0",
-  "type": "module",
-  "scripts": {
-    "dev": "vite --port=3000 --host=0.0.0.0",
-    "build": "vite build",
-    "preview": "vite preview",
-    "clean": "rm -rf dist server.js",
-    "lint": "tsc --noEmit"
-  },
-  "dependencies": {
-    "@google/genai": "^2.4.0",
-    "@tailwindcss/vite": "^4.1.14",
-    "@vitejs/plugin-react": "^5.0.4",
-    "d3-geo": "^3.1.1",
-    "dotenv": "^17.2.3",
-    "express": "^4.21.2",
-    "lucide-react": "^0.546.0",
-    "motion": "^12.23.24",
-    "react": "^19.0.1",
-    "react-dom": "^19.0.1",
-    "topojson-client": "^3.1.0",
-    "vite": "^6.2.3"
-  },
-  "devDependencies": {
-    "@types/express": "^4.17.21",
-    "@types/node": "^22.14.0",
-    "autoprefixer": "^10.4.21",
-    "esbuild": "^0.25.0",
-    "tailwindcss": "^4.1.14",
-    "tsx": "^4.21.0",
-    "typescript": "~5.8.2",
-    "vite": "^6.2.3"
-  }
-}
+# E-mail setup — connect your e-mail to the Milk Pop platform
+
+This gets **real** e-mail working: "Your payslip is available", "You have a new
+shift scheduled", interview/offer messages to candidates, and the test button
+in *Admin Panel → Company Settings*.
+
+Why the extra step? A website running in a browser cannot send e-mail by
+itself — putting your mail password in the frontend would let anyone who opens
+DevTools steal it. So the app calls a tiny server function inside your Supabase
+project, and that function talks to an e-mail provider (Resend).
+
+Total time: about 5 minutes. Everything below is on free tiers.
+
+---
+
+## Step 1 — Create a free Resend account
+
+1. Go to https://resend.com and sign up (free tier: 3,000 e-mails/month).
+2. In the Resend dashboard open **API Keys → Create API Key**.
+3. Copy the key (starts with `re_`). You'll paste it in Step 3.
+
+**Sending address:**
+- **Testing right now:** skip domain setup. The function defaults to
+  `onboarding@resend.dev`, but Resend only delivers that to the e-mail address
+  you signed up with — good for the "Send test e-mail" button, nothing else.
+- **Real use (staff inboxes):** in Resend open **Domains → Add Domain**, enter
+  your domain (e.g. `milkpop.co.uk`), and add the DNS records Resend shows you
+  at your domain registrar. Once verified you can send from e.g.
+  `office@milkpop.co.uk`.
+
+## Step 2 — Deploy the Edge Function
+
+Easiest path — Supabase Dashboard, no installs:
+
+1. Open your project at https://supabase.com/dashboard.
+2. Left sidebar → **Edge Functions** → **Deploy a new function** → *Via Editor*.
+3. Name it exactly: `send-email`
+4. Delete the sample code and paste in the full contents of
+   `supabase/functions/send-email/index.ts` from this project.
+5. In the function settings, turn **OFF** "Verify JWT" (the app calls it with
+   the anon key; the function itself validates its input).
+6. Click **Deploy**.
+
+(Alternative, if you use the Supabase CLI:
+`supabase functions deploy send-email --no-verify-jwt`)
+
+## Step 3 — Add the secrets
+
+1. Dashboard → **Edge Functions → Secrets** (or Project Settings → Functions).
+2. Add:
+   - `RESEND_API_KEY` = the `re_…` key from Step 1
+   - `EMAIL_FROM` = your verified sender, e.g. `office@milkpop.co.uk`
+     (leave it out while testing to use `onboarding@resend.dev`)
+
+## Step 4 — Switch it on in the app
+
+1. Admin Panel → **Company Settings → E-mail notifications**.
+2. Tick **Enable e-mail sending**, set the sender name (e.g. "Milk Pop Office").
+3. Press **Send test e-mail** and check your inbox (and spam folder).
+
+Done. From now on:
+
+| Where | What gets e-mailed |
+|---|---|
+| Payslips Ledger → Send e-mail | "Your payslip is available" with the full breakdown |
+| Scheduling Matrix → Confirm Shift Allocation | "You have a new shift scheduled" to that team member |
+| Careers Feed → INTERVIEW / HIRE | Interview invitation / offer message to the candidate |
+| Company Settings | Test e-mail |
+
+## Troubleshooting
+
+- **"The send-email Edge Function is not deployed yet"** — Step 2 wasn't
+  completed, or the function name isn't exactly `send-email`.
+- **"Resend 403 …"** — you're sending *from* a domain you haven't verified, or
+  *to* an outside address while still on `onboarding@resend.dev`. Verify your
+  domain (Step 1) and set `EMAIL_FROM`.
+- **"RESEND_API_KEY secret is not set"** — Step 3.
+- **401 errors** — "Verify JWT" is still enabled on the function; turn it off
+  and redeploy.
