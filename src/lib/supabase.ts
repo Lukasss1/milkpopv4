@@ -76,10 +76,26 @@ export function sbSelect<T = any>(table: string, query = 'select=*'): Promise<T[
 /** Bulk UPSERT on primary key. Returns nothing (Prefer: return=minimal keeps payloads small). */
 export function sbUpsert(table: string, rows: any[], onConflict = 'id'): Promise<void> {
   if (!rows.length) return Promise.resolve();
+
+  // Ensure every row has the exact same keys
+  const allKeys = Array.from(
+    new Set(rows.flatMap(row => Object.keys(row)))
+  );
+
+  const normalizedRows = rows.map(row => {
+    const normalized: Record<string, any> = {};
+    for (const key of allKeys) {
+      normalized[key] = key in row ? row[key] : null;
+    }
+    return normalized;
+  });
+
   return rest<void>(`${table}?on_conflict=${onConflict}`, {
     method: 'POST',
-    headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
-    body: JSON.stringify(rows),
+    headers: {
+      Prefer: 'resolution=merge-duplicates,return=minimal',
+    },
+    body: JSON.stringify(normalizedRows),
   });
 }
 
